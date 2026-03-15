@@ -50,16 +50,18 @@ def create_calendar_event(title, description, start_iso):
     """Inserts a new appointment into the calendar."""
     service = get_calendar_service()
     
-    # Calculate end time (default 1 hour later)
-    start_dt = datetime.datetime.fromisoformat(start_iso.replace('Z', ''))
-    end_iso = (start_dt + datetime.timedelta(hours=1)).isoformat() + 'Z'
+    # Bierzemy tylko 19 pierwszych znaków (np. "2026-03-17T14:00:00") - ucinamy "+01:00" i "Z"
+    czysta_data = start_iso[:19] 
+    start_dt = datetime.datetime.fromisoformat(czysta_data)
+    end_dt = start_dt + datetime.timedelta(hours=1) # Wydarzenie trwa 1 godzinę
 
     event = {
         'summary': title,
         'description': description,
-        'start': {'dateTime': start_iso, 'timeZone': 'Europe/Warsaw'},
-        'end': {'dateTime': end_iso, 'timeZone': 'Europe/Warsaw'},
+        'start': {'dateTime': start_dt.isoformat(), 'timeZone': 'Europe/Warsaw'},
+        'end': {'dateTime': end_dt.isoformat(), 'timeZone': 'Europe/Warsaw'},
     }
 
+    # Wysyłamy do Google
     event = service.events().insert(calendarId='primary', body=event).execute()
     return event.get('htmlLink')

@@ -1,34 +1,42 @@
-import os
 import json
+import datetime
 from google import genai
-from dotenv import load_dotenv
 
-load_dotenv()
-
-client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-
-SYSTEM_PROMPT = """
-You are an expert AI Assistant for an Electrician. 
-Your goal is to process incoming emails and manage the Google Calendar.
-When provided with an email and a list of free slots, you must:
-1. Determine if the email is a service request.
-2. Extract client details (name, issue, location).
-3. Match the request with the best available free slot.
-4. Draft a professional reply in Polish.
-
-You must ALWAYS respond in valid JSON format.
-"""
+client = genai.Client()
 
 def analyze_request(email_content, free_slots):
-    user_prompt = f"FREE SLOTS: {free_slots}\n\nEMAIL CONTENT: {email_content}"
+    # Dajemy AI aktualną datę, żeby wiedziało kiedy jest "wtorek"
+    dzisiaj = datetime.datetime.now().strftime("%Y-%m-%d")
+    
+    prompt = f"""
+    Jesteś asystentem elektryka.
+    DZISIEJSZA DATA TO: {dzisiaj}
+    
+    Przeanalizuj maila i sprawdź wolne terminy.
+    WOLNE TERMINY: {free_slots}
+    TREŚĆ MAILA: {email_content}
+    
+    Zwróć wynik WYŁĄCZNIE jako czysty JSON. Nie dodawaj żadnego tekstu przed ani po.
+    Struktura JSONa MUSI wyglądać dokładnie tak:
+    {{
+        "is_job_request": true,
+        "job_type": "krótka nazwa zlecenia",
+        "client_name": "imię i nazwisko",
+        "summary": "krótki opis",
+        "suggested_slot": "data w formacie ISO np. 2026-03-17T14:00:00Z",
+        "suggested_reply": "treść maila z odpowiedzią po polsku"
+    }}
+    """
     
     response = client.models.generate_content(
-        model="gemini-3-flash-preview",
-        contents=user_prompt,
-        config={
-            "system_instruction": SYSTEM_PROMPT,
-            "response_mime_type": "application/json"
-        }
+        model="gemini-2.5-flash", 
+        contents=prompt
     )
     
-    return json.loads(response.text)
+    tekst = response.text.strip()
+    if tekst.startswith("```json"):
+        tekst = tekst[7:]
+    if tekst.endswith("```"):
+        tekst = tekst[:-3]
+        
+    return json.loads(tekst.strip())
